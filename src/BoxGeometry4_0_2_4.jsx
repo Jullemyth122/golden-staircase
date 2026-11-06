@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 
@@ -6,6 +6,9 @@ import { LightProbeGrid } from 'three/addons/lighting/LightProbeGrid.js';
 import { LightProbeGridHelper } from 'three/addons/helpers/LightProbeGridHelper.js';
 
 import { EffectComposer, Noise, Bloom } from '@react-three/postprocessing';
+import BirdsFlock from './BirdsFlock';
+import FloatingShapes from './FloatingShapes';
+import GoldenEmbers from './GoldenEmbers';
 
 const _dummy = new THREE.Object3D();
 
@@ -119,18 +122,21 @@ const BoxGeometry4_0_2_4 = ({
         const railRadius = innerRadius + widthX - (2 * scale);
 
         for (let i = 0; i < stepCount; i++) {
-            const startX = i * (depthZ + gaps);
+            // Position on the tread of step i
+            const startX = i * (depthZ + gaps) + depthZ * 0.5;
             const startY = i * heightY;
             const progress = startX / totalX;
             const angle = progress * totalAngle;
             const x = Math.cos(angle) * railRadius * (gaps / scale);
             const z = Math.sin(angle) * railRadius * (gaps / scale);
-            const baseStepY = startY - 25;
+            const stepTopY = startY + heightY - 25;
 
-            pts.push(new THREE.Vector3(x, baseStepY + POLE_HEIGHT, z));
+            // Handrail tube point (sits POLE_HEIGHT above the step tread)
+            pts.push(new THREE.Vector3(x, stepTopY + POLE_HEIGHT, z));
 
-            if (i % 5 === 0) {
-                poles.push([x, baseStepY + POLE_HEIGHT / 2, z]);
+            // Stand/baluster position (every 2 steps or every step)
+            if (i % 2 === 0) {
+                poles.push([x, stepTopY + POLE_HEIGHT / 2, z]);
             }
         }
         return {
@@ -236,10 +242,12 @@ const BoxGeometry4_0_2_4 = ({
         return geo;
     }, [depthZ, gaps, heightY, innerRadius, scale, stepCount, totalAngle, totalX, widthX]);
     // --- 4. SET INSTANCED POLE MATRICES ---
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!polesRef.current) return;
         polePositions.forEach(([x, y, z], i) => {
             _dummy.position.set(x, y, z);
+            _dummy.rotation.set(0, 0, 0);
+            _dummy.scale.set(1, 1, 1);
             _dummy.updateMatrix();
             polesRef.current.setMatrixAt(i, _dummy.matrix);
         });
@@ -406,11 +414,24 @@ const BoxGeometry4_0_2_4 = ({
         <meshStandardMaterial color={0xffffff} roughness={0.4} metalness={0.7} />
     ), []);
 
-    const whiteMat = useMemo(() => (
+    const goldAccentMat = useMemo(() => (
+        <meshStandardMaterial color={0xd4a843} roughness={0.3} metalness={0.8} />
+    ), []);
+
+    const floorMat = useMemo(() => (
         <meshStandardMaterial
-            color={0xffffff}
+            color={0xf2ebe0}
+            roughness={0.65}
+            metalness={0.15}
+            side={THREE.DoubleSide}
+        />
+    ), []);
+
+    const wallMat = useMemo(() => (
+        <meshStandardMaterial
+            color={0xf6f0e6}
             roughness={0.9}
-            metalness={0.1}
+            metalness={0.05}
             side={THREE.DoubleSide}
         />
     ), []);
@@ -437,17 +458,20 @@ const BoxGeometry4_0_2_4 = ({
                 visible={giEnabled}
             />
 
+            {/* Handrail */}
             <mesh castShadow>
-                <tubeGeometry args={[handrailCurve, 100, 0.05, 6, false]} />
+                <tubeGeometry args={[handrailCurve, 200, 0.04, 12, false]} />
                 {metalMat}
             </mesh>
 
+            {/* Handrail Stands / Balusters */}
             <instancedMesh
                 ref={polesRef}
                 args={[undefined, undefined, polePositions.length]}
                 castShadow
+                frustumCulled={false}
             >
-                <cylinderGeometry args={[0.03, 0.03, POLE_HEIGHT, 6]} />
+                <cylinderGeometry args={[0.025, 0.025, POLE_HEIGHT, 8]} />
                 {metalMat}
             </instancedMesh>
 
@@ -472,18 +496,31 @@ const BoxGeometry4_0_2_4 = ({
 
             <points geometry={particlesGeometry} material={pointsMat} position={[0, -25, 0]} renderOrder={1} />
 
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -25, 0]} receiveShadow>
-                <circleGeometry args={[25, 48]} />
-                {whiteMat}
-            </mesh>
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 30, 0]} receiveShadow>
-                <circleGeometry args={[25, 48]} />
-                {whiteMat}
+            {/* Levitating Geometric Artifacts Above Random Stairs */}
+            <FloatingShapes />
+
+            {/* Ethereal Flying Birds Flanking Stairs & Wide View Framing */}
+            <BirdsFlock count={36} />
+
+            {/* Floating Golden Dust Particles / Embers in Atrium */}
+            <GoldenEmbers count={350} />
+
+            {/* Floor and Architectural Gold Ring Inlays */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -24.99, 0]} receiveShadow>
+                <circleGeometry args={[25, 64]} />
+                {floorMat}
             </mesh>
 
+            {/* Ceiling */}
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 30, 0]} receiveShadow>
+                <circleGeometry args={[25, 48]} />
+                {wallMat}
+            </mesh>
+
+            {/* Rotunda Wall Cylinder */}
             <mesh position={[0, 2.5, 0]} receiveShadow>
-                <cylinderGeometry args={[25, 25, 55, 48, 32, true]} />
-                {whiteMat}
+                <cylinderGeometry args={[25, 25, 55, 64, 32, true]} />
+                {wallMat}
             </mesh>
 
             <EffectComposer>

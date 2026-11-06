@@ -1,86 +1,36 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
 import BoxGeometry4_0_2_4 from "./BoxGeometry4_0_2_4";
+import CameraController from "./CameraController";
 import "./App.css";
 
-/* ─── Icon components (inline SVG, no deps) ─────────────────── */
-const IconRotate = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21.5 2v6h-6" /><path d="M21.34 15.57a10 10 0 1 1-.57-8.38" />
-  </svg>
-);
-
-const IconEye = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
-const IconLight = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="5" />
-    <line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" />
-    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-    <line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" />
-    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-  </svg>
-);
-
-const IconGrid = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
-    <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-  </svg>
-);
-
-const IconMaximize = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
-  </svg>
-);
-
-/* ─── App ────────────────────────────────────────────────────── */
 export default function App() {
   const [loaded, setLoaded] = useState(false);
-  const [giEnabled, setGiEnabled] = useState(true);
-  const [showProbes, setProbes] = useState(false);
-  const [autoRotate, setRotate] = useState(false);
-  const cursorRef = useRef(null);
-  const cursorRingRef = useRef(null);
+  const wideOverlayRef = useRef(null);
 
-  /* Loading shimmer */
+  /* Loading fade */
   useEffect(() => {
-    const t = setTimeout(() => setLoaded(true), 2600);
+    const t = setTimeout(() => setLoaded(true), 1500);
     return () => clearTimeout(t);
   }, []);
 
-  /* Custom cursor tracking */
-  const onMouseMove = useCallback((e) => {
-    const x = e.clientX, y = e.clientY;
-    if (cursorRef.current) {
-      cursorRef.current.style.left = x + "px";
-      cursorRef.current.style.top = y + "px";
-    }
-    if (cursorRingRef.current) {
-      cursorRingRef.current.style.left = x + "px";
-      cursorRingRef.current.style.top = y + "px";
+  const handleWideProgress = useCallback((factor) => {
+    if (!wideOverlayRef.current) return;
+    if (factor < 0.01) {
+      wideOverlayRef.current.style.opacity = "0";
+      wideOverlayRef.current.style.pointerEvents = "none";
+      wideOverlayRef.current.style.transform = "scale(0.97) translateY(16px)";
+    } else {
+      wideOverlayRef.current.style.opacity = factor.toFixed(3);
+      wideOverlayRef.current.style.pointerEvents = factor > 0.5 ? "auto" : "none";
+      const yOffset = (1.0 - factor) * 16;
+      const scale = 0.97 + factor * 0.03;
+      wideOverlayRef.current.style.transform = `scale(${scale.toFixed(3)}) translateY(${yOffset.toFixed(1)}px)`;
     }
   }, []);
 
-  useEffect(() => {
-    window.addEventListener("mousemove", onMouseMove);
-    return () => window.removeEventListener("mousemove", onMouseMove);
-  }, [onMouseMove]);
-
   return (
     <div className="app-root">
-
-      {/* ── Custom cursor ─────────────────────────────────────── */}
-      <div ref={cursorRef} className="cursor" />
-      <div ref={cursorRingRef} className="cursor-ring" />
-
       {/* ── Loading screen ────────────────────────────────────── */}
       <div className={`loading-screen${loaded ? " hidden" : ""}`}>
         <div className="loading-glyph">Rendering Scene</div>
@@ -93,7 +43,7 @@ export default function App() {
       {/* ── Three.js Canvas ───────────────────────────────────── */}
       <div className="canvas-wrapper">
         <Canvas
-          camera={{ position: [0, 15, 0], fov: 75 }}
+          camera={{ position: [12.8, -22, 0], fov: 65, near: 0.1, far: 200 }}
           shadows
           dpr={[1, 2]}
           flat
@@ -104,132 +54,113 @@ export default function App() {
           }}
           style={{ width: "100%", height: "100vh" }}
         >
-          <BoxGeometry4_0_2_4 giEnabled={giEnabled} showProbes={showProbes} />
-          <OrbitControls autoRotate={autoRotate} autoRotateSpeed={0.4} enableDamping dampingFactor={0.06} />
+          {/* Active GI Probe with Global Illumination */}
+          <BoxGeometry4_0_2_4 giEnabled={true} showProbes={false} />
+          {/* Smooth Camera Climbing & Transition Controller */}
+          <CameraController isCinematic={true} onWideProgress={handleWideProgress} />
         </Canvas>
       </div>
 
-      {/* ── Atmosphere ────────────────────────────────────────── */}
+      {/* ── Wide View Editorial Portfolio UI ─────────────────── */}
+      <div ref={wideOverlayRef} className="wideview-overlay" style={{ opacity: 0 }}>
+        {/* Top Framing Bar */}
+        <div className="wideview-header">
+          <div className="wideview-plus-track">
+            <span className="plus-sym">+</span>
+            <span className="plus-sym">+</span>
+            <span className="plus-sym">+</span>
+            <span className="plus-sym">+</span>
+            <span className="plus-sym">+</span>
+          </div>
+          <div className="wideview-clip-badge">
+            <span className="badge-live-dot" />
+            <span>PANORAMIC ROTUNDA PERSPECTIVE</span>
+          </div>
+          <div className="wideview-coords">
+            <span>LAT 45.18°N</span>
+            <span className="coord-sep">/</span>
+            <span>LONG 09.24°E</span>
+            <span className="coord-sep">/</span>
+            <span>ELEV +16.5M</span>
+          </div>
+        </div>
+
+        {/* Hero Title Block */}
+        <div className="wideview-hero">
+          <div className="wideview-hero-tag">
+            <span className="tag-bracket">[</span>
+            <span>03 // GRAND ATRIUM PERSPECTIVE</span>
+            <span className="tag-bracket">]</span>
+            <span className="hero-tag-pluses">+ + + + +</span>
+          </div>
+
+          <h1 className="wideview-title">
+            <span className="title-line-1">SPIRAL 3D</span>
+            <span className="title-line-2">PORTFOLIO</span>
+          </h1>
+
+          <div className="wideview-clip-ribbon">
+            <div className="clip-ribbon-tag">
+              <span>PROCEDURAL THREE.JS ARCHITECTURE</span>
+            </div>
+            <div className="ribbon-line" />
+            <span className="ribbon-plus">+</span>
+          </div>
+        </div>
+
+        {/* 3 Modular Feature Cards with Clip Path */}
+        <div className="wideview-grid">
+          <div className="wideview-card clip-chamfer-tl">
+            <div className="card-top">
+              <span className="card-num">+ 01</span>
+              <span className="card-cat">GEOMETRY</span>
+            </div>
+            <h3 className="card-heading">Infinite Spiral</h3>
+            <p className="card-body">
+              200 mathematical steps extruded with Catmull-Rom balustrades and instanced stands.
+            </p>
+            <div className="card-plus-row">+ + + +</div>
+          </div>
+
+          <div className="wideview-card clip-chamfer-tr">
+            <div className="card-top">
+              <span className="card-num">+ 02</span>
+              <span className="card-cat">ATMOSPHERE</span>
+            </div>
+            <h3 className="card-heading">Origami Flocks</h3>
+            <p className="card-body">
+              36 aerodynamic origami birds flanking the stairs with 350 floating golden dust embers.
+            </p>
+            <div className="card-plus-row">+ + + +</div>
+          </div>
+
+          <div className="wideview-card clip-chamfer-br">
+            <div className="card-top">
+              <span className="card-num">+ 03</span>
+              <span className="card-cat">PHYSICS</span>
+            </div>
+            <h3 className="card-heading">Damped Motion</h3>
+            <p className="card-body">
+              Seamless spring damping physics bridging 90% ascent into a grand panoramic orbit.
+            </p>
+            <div className="card-plus-row">+ + + +</div>
+          </div>
+        </div>
+
+        {/* Bottom Grid Bar */}
+        <div className="wideview-footer">
+          <div className="footer-scroll-prompt">
+            <span className="scroll-pulse-plus">+</span>
+            <span>CONTINUE SCROLLING TO DESCEND</span>
+          </div>
+          <div className="footer-plus-matrix">+ + + + + + + + +</div>
+          <div className="footer-edition">VOL. 04 // 2026 EDITION</div>
+        </div>
+      </div>
+
+      {/* ── Atmosphere Overlays ───────────────────────────────── */}
       <div className="grain-overlay" />
       <div className="vignette" />
-
-      {/* ── Corner marks ──────────────────────────────────────── */}
-      <div className="corner-mark tl" />
-      <div className="corner-mark tr" />
-      <div className="corner-mark bl" />
-      <div className="corner-mark br" />
-
-      {/* ── UI Layer ──────────────────────────────────────────── */}
-      <div className="ui-layer">
-
-        {/* Header */}
-        <header className="header">
-          <div className="logo-block">
-            <span className="logo-title">Spiralis</span>
-            <span className="logo-sub">Architectural Visualisation</span>
-          </div>
-
-          {/* <nav className="header-nav">
-            <button className="nav-item">Gallery</button>
-            <button className="nav-item">Materials</button>
-            <button className="nav-item">About</button>
-          </nav> */}
-        </header>
-
-        {/* Title plate */}
-        <div className="title-plate">
-          <div className="title-eyebrow">No. 04 — Staircase Study</div>
-          <h1 className="title-main">
-            The<br /><em>Infinite</em><br />Ascent
-          </h1>
-          <div className="ornament">
-            <div className="ornament-line" />
-            <div className="ornament-diamond" />
-            <div className="ornament-line right" />
-          </div>
-          <p className="title-descriptor">
-            A meditative spiral rendered in warm light &amp; shadow,&nbsp;
-            turning endlessly upward.
-          </p>
-        </div>
-
-        {/* Info panel */}
-        <aside className="info-panel">
-          <div className="info-panel-inner">
-            <div className="info-label">Scene Parameters</div>
-
-            <div className="stat-row">
-              <span className="stat-name">Steps</span>
-              <span className="stat-value">200</span>
-            </div>
-            <div className="stat-row">
-              <span className="stat-name">Spiral Turns</span>
-              <span className="stat-value">3</span>
-            </div>
-            <div className="stat-row">
-              <span className="stat-name">Light Sources</span>
-              <span className="stat-value">8 × Warm</span>
-            </div>
-            <div className="stat-row">
-              <span className="stat-name">GI Probes</span>
-              <span className="stat-value">{giEnabled ? "Active" : "Inactive"}</span>
-            </div>
-            <div className="stat-row">
-              <span className="stat-name">Post FX</span>
-              <span className="stat-value">Film Grain</span>
-            </div>
-          </div>
-        </aside>
-
-        {/* Controls strip */}
-        <div className="controls-strip">
-          <button
-            className={`ctrl-btn${autoRotate ? " active" : ""}`}
-            onClick={() => setRotate(v => !v)}
-            title="Auto Rotate"
-          >
-            <IconRotate className="ctrl-icon" />
-            <span className="ctrl-label">Rotate</span>
-          </button>
-
-          <div className="ctrl-divider" />
-
-          <button
-            className={`ctrl-btn${giEnabled ? " active" : ""}`}
-            onClick={() => setGiEnabled(v => !v)}
-            title="Global Illumination"
-          >
-            <IconLight className="ctrl-icon" />
-            <span className="ctrl-label">GI</span>
-          </button>
-
-          <div className="ctrl-divider" />
-
-          <button
-            className={`ctrl-btn${showProbes ? " active" : ""}`}
-            onClick={() => setProbes(v => !v)}
-            title="Show Probes"
-          >
-            <IconGrid className="ctrl-icon" />
-            <span className="ctrl-label">Probes</span>
-          </button>
-
-          <div className="ctrl-divider" />
-
-          <button
-            className="ctrl-btn"
-            onClick={() => document.documentElement.requestFullscreen?.()}
-            title="Fullscreen"
-          >
-            <IconMaximize className="ctrl-icon" />
-            <span className="ctrl-label">Full</span>
-          </button>
-        </div>
-
-        {/* Subtle drag hint */}
-        <span className="hint-tag">drag to explore</span>
-
-      </div>
     </div>
   );
 }
